@@ -9,8 +9,8 @@ import sys
 from colcon_core.logging import colcon_logger
 from colcon_core.plugin_system import satisfies_version
 from colcon_core.verb import VerbExtensionPoint
-from colcon_sarif.sarif import get_test_results
-from colcon_sarif.sarif import Result
+from process_sarif.sarif_helpers import get_sarif_in_build, find_duplicate_results, replace_misra_results
+from process_sarif.visualize import main as gen_images
 
 logger = colcon_logger.getChild(__name__)
 
@@ -18,7 +18,7 @@ logger = colcon_logger.getChild(__name__)
 class TestResultVerb(VerbExtensionPoint):
     """Show the test results generated when testing a set of packages."""
 
-    __test__ = False  # prevent the class to falsely be identified as a test
+    __test__ = False  # prevent the class from being identified as a test
 
     def __init__(self):  # noqa: D107
         super().__init__()
@@ -26,10 +26,10 @@ class TestResultVerb(VerbExtensionPoint):
 
     def add_arguments(self, *, parser):  # noqa: D102
         parser.add_argument(
-            '--test-result-base',
+            '--base-dir',
             type=_argparse_existing_dir,
             default='build',
-            help='The base path for all test results (default: build)')
+            help='The directory in which to find the SARIF files (default: build)')
         parser.add_argument(
             '--all',
             action='store_true',
@@ -38,6 +38,10 @@ class TestResultVerb(VerbExtensionPoint):
             '--verbose',
             action='store_true',
             help='Show additional information for each error / failure')
+        parser.add_argument(
+            '--gen-images',
+            action='store_true',
+            help='Generate images')
         parser.add_argument(
             '--result-files-only',
             action='store_true',
@@ -55,12 +59,18 @@ class TestResultVerb(VerbExtensionPoint):
             help='Same as --delete without an interactive confirmation')
 
     def main(self, *, context):  # noqa: D102
+
         all_files = set() \
             if (context.args.delete or context.args.delete_yes) else None
-        all_results = list(get_test_results(
-            context.args.test_result_base,
-            collect_details=context.args.verbose,
-            files=all_files))
+
+        #all_results = list(get_test_results(
+        #    context.args.base_dir,
+        #    collect_details=context.args.verbose,
+        #    files=all_files))
+        all_results = get_sarif_in_build(verbose=True, log_path="logfile.txt")
+
+        print(f'base_dir: {context.args.base_dir}')
+        print(f'all_results: {all_results}')
 
         if context.args.delete or context.args.delete_yes:
             if not all_files:
@@ -86,27 +96,32 @@ class TestResultVerb(VerbExtensionPoint):
             if r.error_count or r.failure_count or context.args.all]
         results.sort(key=lambda r: r.path)
 
+        if context.args.gen_images:
+            gen_images()
+            return
+
         if context.args.result_files_only:
             for result in results:
                 print(result.path)
-        else:
-            for result in results:
-                print(result)
-                if context.args.verbose:
-                    for detail in result.details:
-                        for i, line in enumerate(detail.splitlines()):
-                            print('-' if i == 0 else ' ', line)
+        #else:
+        #    for result in results:
+        #        print(result)
+        #        if context.args.verbose:
+        #            for detail in result.details:
+        #                for i, line in enumerate(detail.splitlines()):
+        #                    print('-' if i == 0 else ' ', line)
 
-        summary = Result('Summary')
-        for result in all_results:
-            summary.add_result(result)
+        #summary = Result('Summary')
+        #for result in all_results:
+        #    summary.add_result(result)
 
-        if not context.args.result_files_only:
-            if results:
-                print()
-            print(summary)
+        #if not context.args.result_files_only:
+        #    if results:
+        #        print()
+        #    print(summary)
 
-        return 1 if summary.error_count or summary.failure_count else 0
+        #return 1 if summary.error_count or summary.failure_count else 0
+        return 0
 
 
 def _argparse_existing_dir(path):
