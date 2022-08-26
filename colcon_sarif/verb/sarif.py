@@ -63,14 +63,11 @@ class TestResultVerb(VerbExtensionPoint):
         all_files = set() \
             if (context.args.delete or context.args.delete_yes) else None
 
-        #all_results = list(get_test_results(
-        #    context.args.base_dir,
-        #    collect_details=context.args.verbose,
-        #    files=all_files))
-        all_results = get_sarif_in_build(verbose=True, log_path="logfile.txt")
+        # TODO:
+        #   use context.args.base_dir
+        #   provide log_path on command line
 
-        print(f'base_dir: {context.args.base_dir}')
-        print(f'all_results: {all_results}')
+        all_results = get_sarif_in_build(verbose=context.args.verbose, log_path="logfile.txt")
 
         if context.args.delete or context.args.delete_yes:
             if not all_files:
@@ -93,16 +90,17 @@ class TestResultVerb(VerbExtensionPoint):
 
         results = [
             r for r in all_results
-            if r.error_count or r.failure_count or context.args.all]
-        results.sort(key=lambda r: r.path)
+            if len(r._results) or context.args.all]
+        #results.sort(key=lambda r: r.path)
+
+        if context.args.result_files_only:
+            for result in results:
+                print(result.path)
 
         if context.args.gen_images:
             gen_images()
             return
 
-        if context.args.result_files_only:
-            for result in results:
-                print(result.path)
         #else:
         #    for result in results:
         #        print(result)
