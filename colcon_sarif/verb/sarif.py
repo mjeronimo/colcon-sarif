@@ -47,7 +47,11 @@ class SarifVerb(VerbExtensionPoint):
         parser.add_argument(
             '--print-filenames',
             action='store_true',
-            help='Print only the paths of the SARIF files')
+            help='Print the SARIF filenames')
+        parser.add_argument(
+            '--print-tools',
+            action='store_true',
+            help='Print information about each tool')
         parser.add_argument(
             '--verbose',
             action='store_true',
@@ -84,6 +88,11 @@ class SarifVerb(VerbExtensionPoint):
         if context.args.print_filenames:
             for filename in sarif_filenames:
                 print(os.path.relpath(filename, os.getcwd()))
+            return 0
+
+        if context.args.print_tools:
+            for sarif_file in sarif_files:
+                print(f'{sarif_file._tool.name}, version {sarif_file._tool.version if sarif_file._tool.version else "<unknown>"}')
             return 0
 
         if context.args.gen_images:
