@@ -6,17 +6,15 @@ from contextlib import suppress
 import os
 import sys
 
-from colcon_core.logging import colcon_logger
 from colcon_core.plugin_system import satisfies_version
 from colcon_core.verb import VerbExtensionPoint
-from process_sarif.sarif_helpers import get_sarif_in_build, find_duplicate_results, replace_misra_results
+from process_sarif.sarif_helpers import \
+    get_sarif_in_build, find_duplicate_results, replace_misra_results
 from process_sarif.visualize import main as gen_images
 
-logger = colcon_logger.getChild(__name__)
 
-
-class TestResultVerb(VerbExtensionPoint):
-    """Show the test results generated when testing a set of packages."""
+class SarifVerb(VerbExtensionPoint):
+    """Display information from SARIF files."""
 
     __test__ = False  # prevent the class from being identified as a test
 
@@ -31,43 +29,38 @@ class TestResultVerb(VerbExtensionPoint):
             default='build',
             help='The directory in which to find the SARIF files (default: build)')
         parser.add_argument(
-            '--all',
+            '--bundle',
             action='store_true',
-            help='Show all test result files (even without errors / failures)')
+            help='Bundle the SARIF files into a single tarball with metadata')
         parser.add_argument(
-            '--verbose',
+            '--delete',
             action='store_true',
-            help='Show additional information for each error / failure')
+            help='Delete all SARIF files. An interactive prompt will ask for confirmation')
+        parser.add_argument(
+            '--delete-yes',
+            action='store_true',
+            help='Same as --delete without an interactive confirmation')
         parser.add_argument(
             '--gen-images',
             action='store_true',
             help='Generate images')
         parser.add_argument(
-            '--result-files-only',
+            '--print-filenames',
             action='store_true',
-            help='Print only the paths of the result files. '
-                 'Use with --all to include files without errors / failures')
+            help='Print only the paths of the SARIF files')
         parser.add_argument(
-            '--delete',
+            '--verbose',
             action='store_true',
-            help='Delete all result files. This might include additional '
-                 'files beside what is listed by --result-files-only. An '
-                 'interactive prompt will ask for confirmation')
-        parser.add_argument(
-            '--delete-yes',
-            action='store_true',
-            help='Same as --delete without an interactive confirmation')
+            help='Show additional information for each issue')
 
     def main(self, *, context):  # noqa: D102
-
-        all_files = set() \
-            if (context.args.delete or context.args.delete_yes) else None
 
         # TODO:
         #   use context.args.base_dir
         #   provide log_path on command line
+        (sarif_filenames, sarif_files) = get_sarif_in_build(verbose=context.args.verbose, log_path="logfile.txt")
 
-        all_results = get_sarif_in_build(verbose=context.args.verbose, log_path="logfile.txt")
+        all_files = sorted(sarif_filenames)
 
         if context.args.delete or context.args.delete_yes:
             if not all_files:
@@ -88,37 +81,15 @@ class TestResultVerb(VerbExtensionPoint):
             print('Deleted %d files' % len(all_files))
             return 0
 
-        results = [
-            r for r in all_results
-            if len(r._results) or context.args.all]
-        #results.sort(key=lambda r: r.path)
-
-        if context.args.result_files_only:
-            for result in results:
-                print(result.path)
+        if context.args.print_filenames:
+            for filename in sarif_filenames:
+                print(os.path.relpath(filename, os.getcwd()))
+            return 0
 
         if context.args.gen_images:
             gen_images()
-            return
+            return 0
 
-        #else:
-        #    for result in results:
-        #        print(result)
-        #        if context.args.verbose:
-        #            for detail in result.details:
-        #                for i, line in enumerate(detail.splitlines()):
-        #                    print('-' if i == 0 else ' ', line)
-
-        #summary = Result('Summary')
-        #for result in all_results:
-        #    summary.add_result(result)
-
-        #if not context.args.result_files_only:
-        #    if results:
-        #        print()
-        #    print(summary)
-
-        #return 1 if summary.error_count or summary.failure_count else 0
         return 0
 
 
